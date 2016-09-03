@@ -1,23 +1,30 @@
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Security;
 
 /**
  * In this program, we demonstrate the use of the Crypter class we developed
  * in the demonstration, Pooh is trying to send Tigger a text file.
  * Pooh encrypt the file, and Tigger decrypt it 
- * @author Jiminy Cricket
+ * @author Gani Yanin & Demitry Hermetz 
  *
  */
 public class Main {
 
 	public static void main(String[] args) {
 
-		//providers: 
-		//The service provider is defined  here for the sake of the exercise,
-		//Oracle recommend that for both historical reasons and by the types of services provided.
+		// provider explanation: 
+		// The service provider is defined  here for the sake of the exercise,
+		// Oracle recommend that for both historical reasons and by the types of services provided.
 		// General purpose applications SHOULD NOT request cryptographic services from specific providers
+		// nonetheless, we chose the BouncyCastle Provider
+		// a. since it has many more cipher suites and algorithms than the default JCE provided by Sun.
+		// b. also, Bouncy Castle is Australian in origin, and therefore is not subject to the Export of cryptography from the United States.
+		// the algorithm AES and the mode CBC were instructed in the exercise
+		Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 		Crypter crypter = new Crypter();
-		crypter.setProvider("SunJCE");
+		crypter.setProvider("BC");
+		
 		crypter.setAlgorithm("AES");
 		crypter.setAlgorithmMode("CBC");
 		crypter.setAlgorithmPadding("PKCS5PADDING");

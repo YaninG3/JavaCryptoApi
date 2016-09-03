@@ -199,6 +199,7 @@ public class Crypter {
             fos.close();
 
             System.out.println("\nfile \"" + cleartextFile + "\" was encrypted to file \"" + ciphertextFile + "\"");
+            System.out.println("\nEncryption algorithm: " + cipher.getAlgorithm() + ", algorithm implementation provider: " + cipher.getProvider());
 	    } catch (Exception ex) {
 	        ex.printStackTrace();
 	    }
@@ -262,6 +263,9 @@ public class Crypter {
             cos.close();
             fis.close();
             fos.close();
+            
+            System.out.println("\nfile \"" + ciphertextFile + "\" was decrypted to file \"" + cleartextFile + "\"");
+            System.out.println("\nDecryption algorithm: " + cipher.getAlgorithm() + ", algorithm implementation provider: " + cipher.getProvider());
             
 		} catch (Exception ex) {
 	        ex.printStackTrace();
