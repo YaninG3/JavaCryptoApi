@@ -1,3 +1,4 @@
+import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -13,6 +14,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -58,55 +61,68 @@ public class Crypter {
 		this.keySize = keySize;
 	}
 
-	
-	public String getProvider() {
-		return provider;
-	}
-	public void setProvider(String provider) {
-		this.provider = provider;
-	}
-	public String getAlgorithm () {
-		return algorithm ;
-	}
-	public void setAlgorithm (String algorithm ) {
-		this.algorithm  = algorithm ;
-	}
-	public Integer getKeySize() {
-		return keySize;
-	}
-	public void setKeySize(int keySize) {
-		this.keySize = keySize;
-	}
-	public String getAlgorithmMode() {
-		return algorithmMode;
-	}
-	public void setAlgorithmMode(String algorithmMode) {
-		this.algorithmMode = algorithmMode;
-	}
-	public String getAlgorithmPadding() {
-		return algorithmPadding;
-	}
-	public void setAlgorithmPadding(String algorithmPadding) {
-		this.algorithmPadding = algorithmPadding;
-	}
 
-	/**
-	 * 
-	 * @param key
-	 * @param initVector
-	 * @param value
-	 * @return
-	 */
-	public void encrypt(String cleartextFile, String ciphertextFile, String configurationFile, PublicKey publicKey) {
+	public void SignAndEncrypt(String cleartextFile, String ciphertextFile, String configurationFile, PublicKey publicKey, PrivateKey privateKey){
+
+		try {
+	    	//set a properties object
+	    	Properties prop = new Properties();
+	    	
+	    	//Sign the file using the private key and write  in prop object 
+	    	signData(privateKey, cleartextFile, prop);
+	    	
+	    	//encrypt the file and write values in prop object
+	    	encrypt(cleartextFile, ciphertextFile, prop, publicKey);
+	    	
+    		// save properties to the project's root folder
+			OutputStream configOutput = new FileOutputStream(configurationFile);
+    		prop.store(configOutput, "Cryptographic Configurations");
+    		System.out.println("\nconfiguration file was saved in \"" + configurationFile + "\"");
+	    	
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+	
+	public Boolean decryptAndVerify(String cleartextFile, String ciphertextFile, String configurationFile, PrivateKey privateKey, PublicKey publicKey){
+
+		try {
+	        //create properties object, and load the configuration file into it
+			Properties prop = new Properties();
+	        FileInputStream configInputStream = new FileInputStream(configurationFile);
+			prop.load(configInputStream);
+			
+			// decrypt the encoded file in ciphertextFile and store decoded in cleartextFile
+			// use the private key and properties object for values
+			decrypt(cleartextFile, ciphertextFile, privateKey, prop);
+			
+			// return a boolean value which approve, or disapprove that
+			// the decoded file was verified using the public key
+			return verifySignature(publicKey, cleartextFile, prop);
+			
+			
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	
+
+	public void encrypt(String cleartextFile, String ciphertextFile, Properties prop, PublicKey publicKey) {
         try {
 
         	/*
-        	 * Step 0. set the input/output streams, set the configuration file, and the properties object
+        	 * Step 0. set the input/output streams
         	 */
             FileInputStream fis = new FileInputStream(cleartextFile);
             FileOutputStream fos = new FileOutputStream(ciphertextFile);
-        	OutputStream configOutput = new FileOutputStream(configurationFile);
-        	Properties prop = new Properties();
+
         	// store algorithm properties in prop object
         	prop.setProperty("algorithm",algorithm);
         	prop.setProperty("algorithmMode",algorithmMode);
@@ -141,8 +157,7 @@ public class Crypter {
         	//save iv in hex format
         	String ivHexStr = bytesToHex(iv);
         	prop.setProperty("iv",ivHexStr);
-    		// save properties to project root folder
-    		prop.store(configOutput, "Cryptographic Configurations");
+
         	
 			/**
 			 * Step 3. Create a Cipher by specifying the following parameters
@@ -183,13 +198,13 @@ public class Crypter {
             fis.close();
             fos.close();
 
-            
+            System.out.println("\nfile \"" + cleartextFile + "\" was encrypted to file \"" + ciphertextFile + "\"");
 	    } catch (Exception ex) {
 	        ex.printStackTrace();
 	    }
     }
 	
-	public void decrypt(String cleartextFile, String ciphertextFile, String configurationFile, PrivateKey privateKey){
+	public void decrypt(String cleartextFile, String ciphertextFile, PrivateKey privateKey, Properties prop){
 		try{
         	/*
         	 * Step 0. set the input/output streams
@@ -199,9 +214,6 @@ public class Crypter {
             /*
              * read configuration file
              */
-            Properties prop = new Properties();
-            FileInputStream configInputStream = new FileInputStream(configurationFile);
-			prop.load(configInputStream);
 			String algorithm = prop.getProperty("algorithm");
 			String algorithmMode = prop.getProperty("algorithmMode");
 			String algorithmPadding = prop.getProperty("algorithmPadding");
@@ -353,6 +365,7 @@ public class Crypter {
 		    //load the public key from the certificate
 		    PublicKey publicKey = cert.getPublicKey();
 		    
+		    System.out.println("PublicKey was obtained from " + keyStorePath + ", entry: " + alias);
 		    return publicKey;
 		    
 		} catch (KeyStoreException e) {
@@ -389,6 +402,7 @@ public class Crypter {
 		    //get the private key from the private key entry
 		    PrivateKey privateKey = privateKeyEntry.getPrivateKey();
 		    
+		    System.out.println("PrivateKey was obtained from " + keyStorePath + ", entry: " + privateKeyAlias);
 		    return privateKey;
 		    
 		} catch (KeyStoreException e) {
@@ -407,5 +421,125 @@ public class Crypter {
 		return null;
 	}
 	
+	public void signData(PrivateKey privateKey, String fileName, Properties prop){
+		try {
+			// creating the Signature object
+			Signature signature = Signature.getInstance("SHA256withRSA");
+			
+			// Initializing the object with a private key
+			signature.initSign(privateKey);
+			
+			// read the provided file in sessions 
+			FileInputStream fis = new FileInputStream(fileName);
+			BufferedInputStream bufin = new BufferedInputStream(fis);
+			byte[] buffer = new byte[1024];
+			int len;
+			
+			// sign the file and update with each session
+			while ((len = bufin.read(buffer)) >= 0) {
+				signature.update(buffer, 0, len);
+			}
+			
+			bufin.close();
+			
+			//get the signature
+			byte[] sig = signature.sign();
+			
+			//convert signature to hex
+			String signatureHex = bytesToHex(sig);
+			
+			//write it in the properties object
+			prop.setProperty("signature", signatureHex);
+			
+			System.out.println("\nfile: \"" + fileName + "\" was signed with private keys");
+			
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			e.printStackTrace();
+		} catch (SignatureException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	
+	public Boolean verifySignature(PublicKey publicKey, String fileName, Properties prop){
+		try {
+			//get the Signature from the properties object
+			String hexSignature = prop.getProperty("signature");
+			byte[] sig = hexStringToByteArray(hexSignature);
+					
+			// creating the Signature object
+			Signature signature = Signature.getInstance("SHA256withRSA");
+			
+			// Initializing the object with the public key
+			signature.initVerify(publicKey);
+			
+			// read the provided file in sessions 
+			FileInputStream fis = new FileInputStream(fileName);
+			BufferedInputStream bufin = new BufferedInputStream(fis);
+			byte[] buffer = new byte[1024];
+			int len;
+			
+			// verify the file and update with each session
+			while ((len = bufin.read(buffer)) >= 0) {
+				signature.update(buffer, 0, len);
+			}
+			
+			bufin.close();
+			
+			// get the answer (true/false)
+			boolean verifies = signature.verify(sig);
+			
+			System.out.println("\nfile: \"" + fileName + "\" has went through signature verification");
+			
+			return verifies;
+			
+		} catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			e.printStackTrace();
+		} catch (SignatureException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return null;
+
+	}
+	
+	public String getProvider() {
+		return provider;
+	}
+	public void setProvider(String provider) {
+		this.provider = provider;
+	}
+	public String getAlgorithm () {
+		return algorithm ;
+	}
+	public void setAlgorithm (String algorithm ) {
+		this.algorithm  = algorithm ;
+	}
+	public Integer getKeySize() {
+		return keySize;
+	}
+	public void setKeySize(int keySize) {
+		this.keySize = keySize;
+	}
+	public String getAlgorithmMode() {
+		return algorithmMode;
+	}
+	public void setAlgorithmMode(String algorithmMode) {
+		this.algorithmMode = algorithmMode;
+	}
+	public String getAlgorithmPadding() {
+		return algorithmPadding;
+	}
+	public void setAlgorithmPadding(String algorithmPadding) {
+		this.algorithmPadding = algorithmPadding;
+	}
+
 }
