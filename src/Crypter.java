@@ -4,6 +4,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.Key;
 import java.security.KeyStore;
@@ -11,6 +12,7 @@ import java.security.KeyStore.PrivateKeyEntry;
 import java.security.KeyStore.ProtectionParameter;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -32,10 +34,10 @@ import javax.crypto.spec.SecretKeySpec;
 
 public class Crypter {
 
-	private String provider = null;
-	private String algorithm = null;
-	private String algorithmMode = null;
-	private String algorithmPadding = null;
+	private String provider = "SunJCE";
+	private String algorithm = "AES";
+	private String algorithmMode = "CBC";
+	private String algorithmPadding = "PKCS5PADDING";
 	private Integer keySize = 128;
 	
 	final private char[] hexArray = "0123456789ABCDEF".toCharArray();	//used by the bytesToHex()
@@ -61,7 +63,16 @@ public class Crypter {
 		this.keySize = keySize;
 	}
 
-
+	/**
+	 * public method that takes a clear text file and sign it with the provided private key
+	 * than encode it and storing the values for decoding in the configuration file
+	 * this method is using other methods in this class that specify the process 
+	 * @param cleartextFile a string representation of the path where the clear text file is stored
+	 * @param ciphertextFile a String representation of the path where the encoded file should be stored 
+	 * @param configurationFile a String representation of the path and filename, where the configuration values should be stored
+	 * @param publicKey a PublicKey object that used to encrypt the symmetric key that needed to decode the file
+	 * @param privateKey a PrivateKey object that will be used to sign the clear text file
+	 */
 	public void SignAndEncrypt(String cleartextFile, String ciphertextFile, String configurationFile, PublicKey publicKey, PrivateKey privateKey){
 
 		try {
@@ -87,6 +98,17 @@ public class Crypter {
 
 	}
 	
+	/**
+	 * this method is taking a cipher file and decode it using the paramaeters found
+	 * in the configuration file
+	 * the method also verify that the retrieved file is genuine using the public key provided 
+	 * @param cleartextFile a String representation of the path and filename where the resulted decoded file should be stored
+	 * @param ciphertextFile a String representation of the path and file name where the cipher file is stored 
+	 * @param configurationFile a String representation of the path and file name where the configuration file is stored
+	 * @param privateKey a PrivateKey object that unlocks the symmetric key from the configuration file
+	 * @param publicKey a PublicKey object that used to verify the authentic of the resulted file
+	 * @return a Boolean value confirming whether the resulted file is the authentic file
+	 */
 	public Boolean decryptAndVerify(String cleartextFile, String ciphertextFile, String configurationFile, PrivateKey privateKey, PublicKey publicKey){
 
 		try {
@@ -113,8 +135,17 @@ public class Crypter {
 	}
 	
 	
-
-	public void encrypt(String cleartextFile, String ciphertextFile, Properties prop, PublicKey publicKey) {
+	/**
+	 * encrypt clearTextFile into cipherTextFile
+	 * the encryption is made by algorithm that was set in advanced in class private members
+	 * the key that used to encrypt the file, is being encrypted also, by the provided Public key
+	 * the needed values for decryption are saved in the properties object
+	 * @param cleartextFile the clear text file to encode
+	 * @param ciphertextFile the result encoded file
+	 * @param prop used to store encryption values, relevant for decryption
+	 * @param publicKey used to encrypt the symmetric key that is being generated
+	 */
+	private void encrypt(String cleartextFile, String ciphertextFile, Properties prop, PublicKey publicKey) {
         try {
 
         	/*
@@ -186,7 +217,7 @@ public class Crypter {
 
             /**
              * Step 6. The encryption is finally done
-             * the file is read by a FileInputStream and written by the previously instantiated CipherOutputStream.
+             * the file is read by a InputStream and written by the previously instantiated CipherOutputStream.
              * The data now is encrypted and written to the file specified by the OutputStream.
              */
             byte[] block = new byte[8];
@@ -205,7 +236,18 @@ public class Crypter {
 	    }
     }
 	
-	public void decrypt(String cleartextFile, String ciphertextFile, PrivateKey privateKey, Properties prop){
+	/**
+	 * the method takes the file specified in ciphertextFile, and decode it
+	 * the result will be saved in the  cleartextFile
+	 * the method uses values from the properties object in order to handle the decryption of the file
+	 * the symmetric key that is needed to decode the file, should be found in encrypted form in the properties object
+	 * it will be decoded using the private key provided
+	 * @param cleartextFile the result clear text file
+	 * @param ciphertextFile the input encoded file
+	 * @param privateKey a key that needed to decode the symmetric key
+	 * @param prop a properties object that retrieved from the configuration file that was generated by the encoding method
+	 */
+	private void decrypt(String cleartextFile, String ciphertextFile, PrivateKey privateKey, Properties prop){
 		try{
         	/*
         	 * Step 0. set the input/output streams
@@ -252,7 +294,7 @@ public class Crypter {
 			CipherOutputStream cos = new CipherOutputStream(fos, cipher);
             
 			/*
-            * the file is read by a FileInputStream and written by the previously instantiated CipherOutputStream.
+            * the file is read by a InputStream and written by the previously instantiated CipherOutputStream.
             * The data now is decrypted and written to the file specified by the OutputStream.
             */
             byte[] block = new byte[8];
@@ -267,12 +309,29 @@ public class Crypter {
             System.out.println("\nfile \"" + ciphertextFile + "\" was decrypted to file \"" + cleartextFile + "\"");
             System.out.println("\nDecryption algorithm: " + cipher.getAlgorithm() + ", algorithm implementation provider: " + cipher.getProvider());
             
-		} catch (Exception ex) {
-	        ex.printStackTrace();
-	    }
+		} catch (FileNotFoundException e) {
+	        e.printStackTrace();
+	    } catch (NoSuchAlgorithmException e) {
+			e.printStackTrace();
+		} catch (NoSuchProviderException e) {
+			e.printStackTrace();
+		} catch (NoSuchPaddingException e) {
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			e.printStackTrace();
+		} catch (InvalidAlgorithmParameterException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
-	
-	public byte[] encryptRsaWithKey(byte[] data, Key key){
+	/**
+	 * takes the  byte array data and encode it using RSA algorithm and the provided key
+	 * @param data the data to be encrypted
+	 * @param key an asymmetric key needed to encrypt the data
+	 * @return encoded byte array
+	 */
+	private byte[] encryptRsaWithKey(byte[] data, Key key){
 		try {
 			//create a Cipher with RSA algorithm
 			Cipher cipher = Cipher.getInstance("RSA");
@@ -297,7 +356,13 @@ public class Crypter {
 		return null;
 	}
 	
-	public byte[] decryptRsaWithKey(byte[] encryptedData, Key key){
+	/**
+	 * decode the received encoded byte array with RSA algorithm
+	 * @param encryptedData encoded byte array
+	 * @param key asymmetric key that used to decrypt the data
+	 * @return decoded byte array
+	 */
+	private byte[] decryptRsaWithKey(byte[] encryptedData, Key key){
 		try {
 			//create a Cipher with RSA algorithm
 			Cipher cipher = Cipher.getInstance("RSA");
@@ -324,8 +389,8 @@ public class Crypter {
 	
 	/**
 	 * this method is converting a byte array to hex format String
-	 * @param bytes
-	 * @return
+	 * @param bytes byte array to be converted
+	 * @return String object of hex representation of the byte array
 	 */
 	public String bytesToHex(byte[] bytes) {
 	    char[] hexChars = new char[bytes.length * 2];
@@ -338,9 +403,9 @@ public class Crypter {
 	}
 	
 	/**
-	 * Thhis method converting hex format string to byte array
-	 * @param s
-	 * @return
+	 * This method converting hex format string to byte array
+	 * @param s an hex form representation String
+	 * @return byte array that retrived from the hex String
 	 */
 	public byte[] hexStringToByteArray(String s) {
 	    int len = s.length();
@@ -352,6 +417,13 @@ public class Crypter {
 	    return data;
 	}
 	
+	/**
+	 * method for obtaining a public key key from a keystore
+	 * @param keyStorePath the path where the keystore is placed
+	 * @param keyStorePassword password needed to unlock the keystore
+	 * @param alias the entry name where the public key is stored within the keystore
+	 * @return PublicKey that was obtained from the keystore
+	 */
 	public PublicKey getPublicKeyFromKeyStore(String keyStorePath, char[] keyStorePassword, String alias){
 		try {
 			//request a KeyStore object relying on the default type
@@ -363,7 +435,7 @@ public class Crypter {
 		    //load the keystore file into the Keystore Object using the provided keystore password
 		    keyStore.load(fis, keyStorePassword);
 		    
-		    //load the certificate from the ketstore
+		    //load the certificate from the keystore
 		    Certificate cert = keyStore.getCertificate(alias);
 		    
 		    //load the public key from the certificate
@@ -386,6 +458,14 @@ public class Crypter {
 		return null;
 	}
 	
+	/**
+	 * method for obtaining a private key from a keystore
+	 * @param keyStorePath the path where the keystore is placed
+	 * @param keyStorePassword password needed to unlock the keystore
+	 * @param privateKeyAlias the entry name where the private key is stored within the keystore
+	 * @param keyPassword a password that required to reach the private key entry
+	 * @return PrivateKey object representation that was obtained from the keystore
+	 */
 	public PrivateKey getPrivateKeyFromKeyStore(String keyStorePath, char[] keyStorePassword, String privateKeyAlias, char[] keyPassword){
 		try {
 			//request a KeyStore object relying on the default type
@@ -425,7 +505,15 @@ public class Crypter {
 		return null;
 	}
 	
-	public void signData(PrivateKey privateKey, String fileName, Properties prop){
+	/**
+	 * method used to provide signature to the provided file
+	 * using the private key
+	 * the signature is registered as a value in the properties object
+	 * @param privateKey private key needed to sign the data
+	 * @param fileName the file path that needs to be sign
+	 * @param prop properties object for storing the signature
+	 */
+	private void signData(PrivateKey privateKey, String fileName, Properties prop){
 		try {
 			// creating the Signature object
 			Signature signature = Signature.getInstance("SHA256withRSA");
@@ -469,7 +557,14 @@ public class Crypter {
 		}
 	}
 	
-	public Boolean verifySignature(PublicKey publicKey, String fileName, Properties prop){
+	/**
+	 * method to verify a signed file using the public key 
+	 * @param publicKey public key that match the private key that initially signed the file
+	 * @param fileName the file that was signed
+	 * @param prop properties object that contain the signature value
+	 * @return a Boolean value which indicate if the signature match the file and the public key (true/false)
+	 */
+	private Boolean verifySignature(PublicKey publicKey, String fileName, Properties prop){
 		try {
 			//get the Signature from the properties object
 			String hexSignature = prop.getProperty("signature");

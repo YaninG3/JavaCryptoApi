@@ -1,6 +1,7 @@
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Security;
+import java.util.Scanner;
 
 /**
  * In this program, we demonstrate the use of the Crypter class we developed
@@ -23,8 +24,8 @@ public class Main {
 		// the algorithm AES and the mode CBC were instructed in the exercise
 		Security.addProvider(new org.bouncycastle.jce.provider.BouncyCastleProvider());
 		Crypter crypter = new Crypter();
+		Scanner reader = new Scanner(System.in);  // Reading from System.in
 		crypter.setProvider("BC");
-		
 		crypter.setAlgorithm("AES");
 		crypter.setAlgorithmMode("CBC");
 		crypter.setAlgorithmPadding("PKCS5PADDING");
@@ -32,19 +33,24 @@ public class Main {
 
 		System.out.println("\n\n------ Encryption Phase ------\n\n");
 		//Specifying Keystore values for Pooh's keystore
-		String poohKeyStore = "poohkeystore.keystore";
-		String poohKeystorePassword = "p00h$t0re";
-		String poohPrivateKeyAlias = "PoohKey";
-		String poohPrivateKeyPassword = "W1nn1ep00h";
-		String tiggerTrustedCertificateAlias = "tiggertrustedcertificate";
+		System.out.println("\nEnter keystore filename: ");
+		String poohKeyStore = reader.next();			//"poohkeystore.keystore";
+		System.out.println("\nEnter keystore's password: ");
+		String poohKeystorePassword = reader.next();	//"p00h$t0re";
+		System.out.println("\nEnter private key alias Name: ");
+		String poohPrivateKeyAlias = reader.next();		//"PoohKey";
+		System.out.println("\nEnter private key alias password: ");
+		String poohPrivateKeyPassword = reader.next();	//"W1nn1ep00h";
+		System.out.println("\nEnter the member's member trusted certificate alias: ");
+		String tiggerTrustedCertificateAlias = reader.next();	//"tiggertrustedcertificate";
 
 		//getting Tigger's public key from Pooh's keystore
 		PublicKey tiggerPublicKey = crypter.getPublicKeyFromKeyStore(poohKeyStore, poohKeystorePassword.toCharArray(), tiggerTrustedCertificateAlias);
-		System.out.println("Tigger's public key: " + crypter.bytesToHex(tiggerPublicKey.getEncoded()));
+		
 		
 		//getting Pooh's private key from his own keystore
 		PrivateKey poohPrivateKey = crypter.getPrivateKeyFromKeyStore(poohKeyStore, poohKeystorePassword.toCharArray(), poohPrivateKeyAlias, poohPrivateKeyPassword.toCharArray());
-		System.out.println("Pooh's private key: " + crypter.bytesToHex(poohPrivateKey.getEncoded()));
+		
 		
 		
 		// encrypt the file "cleartext.txt", store the encryption in "ciphertextSymm.txt"
@@ -54,19 +60,24 @@ public class Main {
 		
 		System.out.println("\n\n------ Decryption Phase ------\n\n");
 		//Specifying Keystore values for Tigger's keystore
-		String tiggerKeyStore = "tiggerkeystore.keystore";
-		String tiggerKeystorePassword = "p00h$t0re";
-		String tiggerPrivateKeyAlias = "TiggerKey";
-		String tiggerPrivateKeyPassword = "ti99er";
-		String poohTrustedCertificateAlias = "PoohTrustedCertificate";
-		
+		System.out.println("\nEnter keystore filename: ");
+		String tiggerKeyStore = reader.next();				//"tiggerkeystore.keystore";
+		System.out.println("\nEnter keystore's password: ");
+		String tiggerKeystorePassword = reader.next();		//"p00h$t0re";
+		System.out.println("\nEnter private key alias name: ");
+		String tiggerPrivateKeyAlias = reader.next();		//"TiggerKey";
+		System.out.println("\nEnter private key alias password: ");
+		String tiggerPrivateKeyPassword = reader.next();	//"ti99er";
+		System.out.println("\nEnter the member's trusted certificate alias: ");
+		String poohTrustedCertificateAlias = reader.next();	//"PoohTrustedCertificate";
+		reader.close();
 		//getting Pooh's public key from Tigger's keystore
 		PublicKey poohPublicKey = crypter.getPublicKeyFromKeyStore(tiggerKeyStore, tiggerKeystorePassword.toCharArray(), poohTrustedCertificateAlias);
-		System.out.println("pooh's public key: " + crypter.bytesToHex(poohPublicKey.getEncoded()));
+		
 		
 		//getting Tigger's private key from Tigger's own keystore
 		PrivateKey tiggerPrivateKey = crypter.getPrivateKeyFromKeyStore(tiggerKeyStore, tiggerKeystorePassword.toCharArray(), tiggerPrivateKeyAlias, tiggerPrivateKeyPassword.toCharArray());
-		System.out.println("tigger's private key: " + crypter.bytesToHex(tiggerPrivateKey.getEncoded()));
+		
 		
 		// decrypt the file "ciphertextSymm.txt", store the decrypted text in "cleartextagain.txt"
 		// read configuration values from "config.properties", including the encrypted secret key,
